@@ -5,7 +5,7 @@ object Reader:
   def readFromFile(fileName: String): String = {
     Try {
       Using.resource(Source.fromFile(fileName)) { source =>
-        source.getLines().mkString
+        source.getLines().mkString("\n")
       }
     } match {
       case Success(text) if text.nonEmpty => text

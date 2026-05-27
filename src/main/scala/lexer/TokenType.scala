@@ -16,6 +16,7 @@ enum TokenType:
 
   case LPAREN, RPAREN
   case LBRACE, RBRACE
-  case SEMICOLON
+  case LBRACKET, RBRACKET
+  case SEMICOLON, COMMA
 
   case EOF

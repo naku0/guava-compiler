@@ -1,0 +1,17 @@
+var z = 7;
+var x = ["guava", "scala", "scala"];
+var count = [91 + 2, z, 24];
+if (z > z) {
+    var count3 = [57, 94 / z, 61 + z];
+    var beta = 2;
+    while (35 == 45) {
+        var x5 = 71 + 50;
+    }
+} else {
+    while (13 == 79) {
+        x[2] = "array";
+    }
+    x[0] = "scala";
+}
+x[0] = "compiler";
+count[0] = 40;

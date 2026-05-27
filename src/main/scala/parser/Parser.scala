@@ -1,8 +1,7 @@
 package parser
 
-import lexer.TokenType.ELSE
 import lexer.{Token, TokenType}
-import parser.expression.{AssignExpression, BinaryExpression, Expression, NumberExpression, UnaryExpression, VariableExpression}
+import parser.expression.*
 import parser.statement.{BlockStatement, ExpressionStatement, IfStatement, PrintStatement, Statement, VarStatement, WhileStatement}
 
 import scala.annotation.tailrec
@@ -164,6 +163,8 @@ object Parser {
             expr match {
               case varExpr: VariableExpression =>
                 Right((AssignExpression(varExpr.name, value), s2))
+              case indexExpr: IndexExpression =>
+                Right((IndexAssignExpression(indexExpr.array, indexExpr.index, value), s2))
               case _ =>
                 Left(s"[Parser Error] Line ${equals.line}: Недопустимая цель для присваивания.")
             }
@@ -266,15 +267,40 @@ object Parser {
           Right((UnaryExpression(op, expr), s))
         case Left(error) => Left(error)
       }
-    } else parsePrimary(state)
+    } else parsePostfix(state)
+  }
+
+  private def parsePostfix(state: Parser): Either[String, (Expression, Parser)] = {
+    parsePrimary(state) match {
+      case Right((expr, next)) => parseIndexAccess(expr, next)
+      case Left(error) => Left(error)
+    }
+  }
+
+  @tailrec
+  private def parseIndexAccess(expr: Expression, state: Parser): Either[String, (Expression, Parser)] = {
+    if (state.check(TokenType.LBRACKET)) {
+      parseExpression(state.advance) match {
+        case Right((index, s1)) =>
+          val (s2, _) = s1.consume(TokenType.RBRACKET, "Ожидается ']' после индекса.")
+          parseIndexAccess(IndexExpression(expr, index), s2)
+        case Left(error) => Left(error)
+      }
+    } else {
+      Right((expr, state))
+    }
   }
 
   private def parsePrimary(state: Parser): Either[String, (Expression, Parser)] = {
     if (state.check(TokenType.NUMBER)) {
       val value = state.current.value.toDouble
       Right((NumberExpression(value), state.advance))
+    } else if (state.check(TokenType.STRING)) {
+      Right((StringExpression(state.current.value), state.advance))
     } else if (state.check(TokenType.ID)) {
       Right((VariableExpression(state.current.value), state.advance))
+    } else if (state.check(TokenType.LBRACKET)) {
+      parseArrayExpression(state.advance)
     } else if (state.check(TokenType.LPAREN)) {
       parseExpression(state.advance) match {
         case Right((expr, s1)) =>
@@ -285,6 +311,27 @@ object Parser {
     } else {
       Left(s"[Parser Error] Line ${state.current.line}: Ожидается выражение.")
     }
+  }
+
+  private def parseArrayExpression(parser: Parser): Either[String, (Expression, Parser)] = {
+    @tailrec
+    def loop(state: Parser, acc: List[Expression]): Either[String, (Expression, Parser)] = {
+      if (state.check(TokenType.RBRACKET)) {
+        Right((ArrayExpression(acc.reverse), state.advance))
+      } else {
+        parseExpression(state) match {
+          case Right((element, s1)) if s1.check(TokenType.COMMA) =>
+            loop(s1.advance, element :: acc)
+          case Right((element, s1)) =>
+            val (s2, _) = s1.consume(TokenType.RBRACKET, "Ожидается ']' после элементов массива.")
+            Right((ArrayExpression((element :: acc).reverse), s2))
+          case Left(error) =>
+            Left(error)
+        }
+      }
+    }
+
+    loop(parser, Nil)
   }
 
 }

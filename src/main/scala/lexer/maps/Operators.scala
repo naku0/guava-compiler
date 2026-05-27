@@ -24,7 +24,10 @@ object Operators:
     ")" -> TokenType.RPAREN,
     "{" -> TokenType.LBRACE,
     "}" -> TokenType.RBRACE,
+    "[" -> TokenType.LBRACKET,
+    "]" -> TokenType.RBRACKET,
     ";" -> TokenType.SEMICOLON,
+    "," -> TokenType.COMMA,
     "!!" -> TokenType.BREAK,
     "~>" -> TokenType.CONTINUE
   )
