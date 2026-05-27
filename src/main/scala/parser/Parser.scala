@@ -2,7 +2,7 @@ package parser
 
 import lexer.{Token, TokenType}
 import parser.expression.*
-import parser.statement.{BlockStatement, ExpressionStatement, IfStatement, PrintStatement, Statement, VarStatement, WhileStatement}
+import parser.statement.*
 
 import scala.annotation.tailrec
 
@@ -43,12 +43,14 @@ object Parser {
 
   private def parseDeclaration(parser: Parser): Either[String, (Statement, Parser)] = {
     if (parser.check(TokenType.VAR)) parseVarDeclaration(parser.advance)
+    else if (parser.check(TokenType.DEF)) parseFunctionDeclaration(parser.advance)
     else parseStatement(parser)
   }
 
   private def parseStatement(parser: Parser): Either[String, (Statement, Parser)] = parser.current.tokenType match {
     case TokenType.IF => parseIfStatement(parser.advance)
     case TokenType.WHILE => parseWhileStatement(parser.advance)
+    case TokenType.RETURN => parseReturnStatement(parser.advance)
     case TokenType.PRINT => parsePrintStatement(parser.advance)
     case TokenType.LBRACE => {
       parseBlock(parser.advance).map{ case(stmt, next) =>
@@ -70,6 +72,39 @@ object Parser {
 
     val (s3, _) = s2.consume(TokenType.SEMICOLON, "Ожидается ';' после объявления переменной.")
     Right((VarStatement(token.value, init), s3))
+  }
+
+  private def parseFunctionDeclaration(parser: Parser): Either[String, (Statement, Parser)] = {
+    val (s1, nameToken) = parser.consume(TokenType.ID, "Ожидается имя функции.")
+    val (s2, _) = s1.consume(TokenType.LPAREN, "Ожидается '(' после имени функции.")
+
+    parseParameters(s2) match {
+      case Right((parameters, s3)) =>
+        val (s4, _) = s3.consume(TokenType.LBRACE, "Ожидается '{' перед телом функции.")
+        parseBlock(s4).map { case (bodyStatements, next) =>
+          (FuncStatement(nameToken.value, parameters, BlockStatement(bodyStatements)), next)
+        }
+      case Left(error) =>
+        Left(error)
+    }
+  }
+
+  private def parseParameters(parser: Parser): Either[String, (List[String], Parser)] = {
+    @tailrec
+    def loop(state: Parser, acc: List[String]): Either[String, (List[String], Parser)] = {
+      if (state.check(TokenType.RPAREN)) {
+        Right((acc.reverse, state.advance))
+      } else {
+        val (s1, parameterToken) = state.consume(TokenType.ID, "Ожидается имя параметра.")
+        if (s1.check(TokenType.COMMA)) loop(s1.advance, parameterToken.value :: acc)
+        else {
+          val (s2, _) = s1.consume(TokenType.RPAREN, "Ожидается ')' после параметров функции.")
+          Right(((parameterToken.value :: acc).reverse, s2))
+        }
+      }
+    }
+
+    loop(parser, Nil)
   }
 
   private def parseIfStatement(parser: Parser): Either[String, (Statement, Parser)] = {
@@ -122,6 +157,20 @@ object Parser {
 
     val (s2, _) = s1.consume(TokenType.SEMICOLON, "Ожидается ';' после значения.")
     Right((PrintStatement(value), s2))
+  }
+
+  private def parseReturnStatement(parser: Parser): Either[String, (Statement, Parser)] = {
+    if (parser.check(TokenType.SEMICOLON)) {
+      Right((ReturnStatement(None), parser.advance))
+    } else {
+      parseExpression(parser) match {
+        case Right((value, s1)) =>
+          val (s2, _) = s1.consume(TokenType.SEMICOLON, "Ожидается ';' после значения return.")
+          Right((ReturnStatement(Some(value)), s2))
+        case Left(error) =>
+          Left(error)
+      }
+    }
   }
 
   private def parseExpressionStatement(parser: Parser): Either[String, (Statement, Parser)] = {
@@ -272,23 +321,55 @@ object Parser {
 
   private def parsePostfix(state: Parser): Either[String, (Expression, Parser)] = {
     parsePrimary(state) match {
-      case Right((expr, next)) => parseIndexAccess(expr, next)
+      case Right((expr, next)) => parsePostfixAccess(expr, next)
       case Left(error) => Left(error)
     }
   }
 
   @tailrec
-  private def parseIndexAccess(expr: Expression, state: Parser): Either[String, (Expression, Parser)] = {
+  private def parsePostfixAccess(expr: Expression, state: Parser): Either[String, (Expression, Parser)] = {
     if (state.check(TokenType.LBRACKET)) {
       parseExpression(state.advance) match {
         case Right((index, s1)) =>
           val (s2, _) = s1.consume(TokenType.RBRACKET, "Ожидается ']' после индекса.")
-          parseIndexAccess(IndexExpression(expr, index), s2)
+          parsePostfixAccess(IndexExpression(expr, index), s2)
         case Left(error) => Left(error)
+      }
+    } else if (state.check(TokenType.LPAREN)) {
+      expr match {
+        case VariableExpression(name) =>
+          parseArguments(state.advance) match {
+            case Right((arguments, next)) =>
+              parsePostfixAccess(CallExpression(name, arguments), next)
+            case Left(error) => Left(error)
+          }
+        case _ =>
+          Left(s"[Parser Error] Line ${state.current.line}: Вызвать можно только функцию по имени.")
       }
     } else {
       Right((expr, state))
     }
+  }
+
+  private def parseArguments(parser: Parser): Either[String, (List[Expression], Parser)] = {
+    @tailrec
+    def loop(state: Parser, acc: List[Expression]): Either[String, (List[Expression], Parser)] = {
+      if (state.check(TokenType.RPAREN)) {
+        Right((acc.reverse, state.advance))
+      } else {
+        parseExpression(state) match {
+          case Right((argument, s1)) if s1.check(TokenType.COMMA) =>
+            loop(s1.advance, argument :: acc)
+          case Right((argument, s1)) =>
+            val (s2, _) = s1.consume(TokenType.RPAREN, "Ожидается ')' после аргументов вызова.")
+            Right(((argument :: acc).reverse, s2))
+          case Left(error) =>
+            Left(error)
+        }
+      }
+    }
+
+    loop(parser, Nil)
   }
 
   private def parsePrimary(state: Parser): Either[String, (Expression, Parser)] = {

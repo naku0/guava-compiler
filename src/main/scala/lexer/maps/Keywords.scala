@@ -8,6 +8,7 @@ object Keywords {
     "var" -> VAR,
     "val" -> VAL,
     "def" -> DEF,
+    "return" -> RETURN,
     "print" -> PRINT,
     "if" -> IF,
     "else" -> ELSE,

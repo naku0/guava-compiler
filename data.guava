@@ -4,3 +4,7 @@ var nums = [1, 2, 3];
 print words[0];
 nums[1] = x + 32;
 print nums;
+
+def add(a,b){
+    return a+b;
+}

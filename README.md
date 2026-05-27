@@ -82,7 +82,10 @@ print nums;
 - массивы: `[1, 2, 3]`;
 - обращение по индексу: `arr[0]`;
 - присваивание по индексу: `arr[1] = 42`;
-- AST-заготовки для функций, `return`, lambda/block/if expressions.
+- функции: `def name(arg1, arg2) { ... }`;
+- вызовы функций: `name(1, 2)`;
+- `return`;
+- AST-заготовки для lambda/block/if expressions.
 
 Семантический анализатор:
 
@@ -152,7 +155,6 @@ sbt "run --file generated.guava"
 ## TODO
 
 - Подключить `TreeInterpreter` к `main`, чтобы программа не только печатала AST, но и выполнялась.
-- Доделать парсинг функций и вызовов функций.
-- Доделать `val`, `return`, `break`, `continue` на уровне парсера и runtime.
+- Доделать `val`, `break`, `continue` на уровне парсера и runtime.
 - Добавить тесты для lexer/parser/semantic/interpreter.
 - Улучшить сообщения об ошибках с line/column во всех AST-узлах.
